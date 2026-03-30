@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 import pandas as pd
 import re
@@ -22,15 +24,17 @@ def rename_columns(data: pd.DataFrame) -> None:
     "What season does this art piece remind you of?": "Q12",
     "If this painting was a food, what would be?": "Q13",
     "Imagine a soundtrack for this painting. Describe that soundtrack without naming any objects in the painting.": "Q14",
-    "Painting": "Label"
-})
+    "Painting": "Label"}, inplace=True)
 
-def question_conversions(data: pd.DataFrame) -> None:
+def question_conversions(data: pd.DataFrame) -> pd.DataFrame:
     # Q3-Q6:
     data["Q3"] = (data["Q3"].str.split(" - ").str[0].astype(float))
     data["Q4"] = (data["Q4"].str.split(" - ").str[0].astype(float))
     data["Q5"] = (data["Q5"].str.split(" - ").str[0].astype(float))
     data["Q6"] = (data["Q6"].str.split(" - ").str[0].astype(float))
+    # Q7-Q8
+    data["Q7"] = pd.to_numeric(data["Q7"], errors="coerce")
+    data["Q8"] = pd.to_numeric(data["Q8"], errors="coerce")
     # Q9:
     data["Q9"] = data["Q9"].str.extract(r'(\d+\.?\d*)').astype(float)
     # Q10-Q12:
@@ -54,9 +58,9 @@ def question_conversions(data: pd.DataFrame) -> None:
     data["12d"] = data["Q12"].apply(lambda x: 1 if "Winter" in str(x) else 0)
 
     # We can drop the original columns:
-    data.drop("Q10", axis=1, inplace=True)
-    data.drop("Q11", axis=1, inplace=True)
-    data.drop("Q12", axis=1, inplace=True)
+    dropColumn(data, "Q10")
+    dropColumn(data, "Q11")
+    dropColumn(data, "Q12")
 
     # We dont want any entries where the respondent did not answer the question:
     cols_10 = ["10a", "10b", "10c", "10d", "10e"]
@@ -67,7 +71,7 @@ def question_conversions(data: pd.DataFrame) -> None:
     data = data[data[cols_11].sum(axis=1) > 0]
     data = data[data[cols_12].sum(axis=1) > 0]
 
-    data = data.dropna()
+    return data.dropna()
 
 # For Q13:
 def normalize(text):
@@ -346,7 +350,7 @@ def map_food(text):
 
         return tuple(matches) if matches else text
 
-def Q13_conversion(data: pd.DataFrame) -> None:
+def Q13_conversion(data: pd.DataFrame) -> pd.DataFrame:
     data["Q13"] = (
         data["Q13"]
         .str.lower()
@@ -356,9 +360,8 @@ def Q13_conversion(data: pd.DataFrame) -> None:
         .str.replace(r'\s+', ' ', regex=True)  # clean extra spaces
     )
 
-    data["Q13"] = data["Q13"].apply(map_food)
-
     mapped = data["Q13"].apply(map_food)
+    data["Q13"] = mapped
 
     food_counts = Counter()
     for entry in mapped:
@@ -378,9 +381,10 @@ def Q13_conversion(data: pd.DataFrame) -> None:
 
     data = data[(data[indicator_cols].sum(axis=1) > 0)]
 
-    data.drop("Q13", axis=1, inplace=True)
+    dropColumn(data, "Q13")
+    return data
 
-def create_bag_of_words_from_file(filename: str) -> Tuple[np.ndarray, list]:
+def create_bag_of_words(data: pd.DataFrame) -> Tuple[np.ndarray, list]:
     """
     Create binary bag of words from soundtrack and feeling description columns.
     
@@ -391,14 +395,12 @@ def create_bag_of_words_from_file(filename: str) -> Tuple[np.ndarray, list]:
         X (np.ndarray) : Binary bag-of-words matrix with shape (n_responses, n_words)
         vocabulary (list) : List of all unique words found in the both columns
     """
-    data = pd.read_csv(filename)
-    
-    soundtrack_col = 'Imagine a soundtrack for this painting. Describe that soundtrack without naming any objects in the painting.'
-    feeling_col = 'Describe how this painting makes you feel.'
-    
+    soundtrack_col = "Q14"
+    feeling_col = "Q2"
+
     all_texts = []
     for i in range(len(data)):
-        combined = str(data[soundtrack_col][i]) + " " + str(data[feeling_col][i])
+        combined = str(data[soundtrack_col].iloc[i]) + " " + str(data[feeling_col].iloc[i])
         all_texts.append(combined)
 
     doc_words = []
@@ -425,16 +427,16 @@ def create_bag_of_words_from_file(filename: str) -> Tuple[np.ndarray, list]:
     return X, vocabulary
 
 # Q2 and Q14 conversion
-def textQ_conversion(data: pd.DataFrame) -> None:
-    X_bow, vocabulary = create_bag_of_words_from_file("ml_challenge_dataset.csv")
+def textQ_conversion(data: pd.DataFrame) -> pd.DataFrame:
+    X_bow, vocab = create_bag_of_words(data)
+    bow_df = pd.DataFrame(X_bow, columns=vocab, index=data.index)
 
-    bow_columns = vocabulary  
-    bow_df = pd.DataFrame(X_bow, columns=bow_columns)
+    data = pd.concat([data, bow_df], axis=1)
 
-    data = pd.concat([data, bow_df.loc[data.index]], axis=1)
+    dropColumn(data, "Q2")
+    dropColumn(data, "Q14")
 
-    data.drop("Q2", axis=1, inplace=True)
-    data.drop("Q14", axis=1, inplace=True)
+    return data
 
 def output_conversion(data: pd.DataFrame) -> None:
    # Create new mappings
@@ -447,6 +449,13 @@ def normalizeTrainingData(data: pd.DataFrame, Features: list[str]) -> None:
     mean = data[Features].mean()
     std = data[Features].std()
     data[Features] = (data[Features] - mean) / std
+    stats_df = pd.DataFrame({
+    "feature": mean.index,
+    "mean": mean.values,
+    "std": std.values
+    })
+
+    stats_df.to_csv("norm_stats.csv", index=False)
 
 def normalizeTestData(data: pd.DataFrame, Features: list[str], trainingMean, trainingStd) -> None:
     data[Features] = (data[Features] - trainingMean) / trainingStd
@@ -454,16 +463,22 @@ def normalizeTestData(data: pd.DataFrame, Features: list[str], trainingMean, tra
 def createTrainingDataFrame(trainingDataFileName: str) -> pd.DataFrame:
     data = pd.read_csv(trainingDataFileName)
     rename_columns(data)
-    question_conversions(data)
-    Q13_conversion(data)
-    textQ_conversion(data)
+    data = question_conversions(data)
+    data = Q13_conversion(data)
+    data = textQ_conversion(data)
     output_conversion(data)
-    normalizeTestData(data, ["Q7", "Q8", "Q9"])
+
+    normalizeTrainingData(data, ["Q7", "Q8", "Q9"])
+
     return data
 
 def getTraining(trainFileName: str) -> tuple[np.ndarray, np.array]:
     data = createTrainingDataFrame(trainFileName)
     X_train = data.drop(columns=['unique_id', 'Label'])
     t_train = data["Label"]
+    pd.DataFrame(X_train).to_csv("X_train.csv", index=False)
+    pd.DataFrame(t_train).to_csv("t_train.csv", index=False)
     return X_train.to_numpy(), t_train.to_numpy()
+
+getTraining("train.csv")
 
