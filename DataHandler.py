@@ -6,6 +6,25 @@ from collections import Counter
 def dropColumn(data: pd.DataFrame, columnName: str) -> None:
     data.drop(columns=[columnName], inplace=True)
 
+def rename_columns(data: pd.DataFrame) -> None:
+    data = data.rename(columns={
+    "On a scale of 1–10, how intense is the emotion conveyed by the artwork?": "Q1",
+    "Describe how this painting makes you feel.": "Q2",
+    "This art piece makes me feel sombre.": "Q3",
+    "This art piece makes me feel content.": "Q4",
+    "This art piece makes me feel calm.": "Q5",
+    "This art piece makes me feel uneasy.": "Q6",
+    "How many prominent colours do you notice in this painting?": "Q7",
+    "How many objects caught your eye in the painting?": "Q8",
+    "How much (in Canadian dollars) would you be willing to pay for this painting?": "Q9",
+    "If you could purchase this painting, which room would you put that painting in?": "Q10",
+    "If you could view this art in person, who would you want to view it with?": "Q11", 
+    "What season does this art piece remind you of?": "Q12",
+    "If this painting was a food, what would be?": "Q13",
+    "Imagine a soundtrack for this painting. Describe that soundtrack without naming any objects in the painting.": "Q14",
+    "Painting": "Label"
+})
+
 def question_conversions(data: pd.DataFrame) -> None:
     # Q3-Q6:
     data["Q3"] = (data["Q3"].str.split(" - ").str[0].astype(float))
@@ -423,3 +442,28 @@ def output_conversion(data: pd.DataFrame) -> None:
 
     # Map paintings to numerical values.
     data["Label"] = data["Label"].map(painting_mapping)
+
+def normalizeTrainingData(data: pd.DataFrame, Features: list[str]) -> None:
+    mean = data[Features].mean()
+    std = data[Features].std()
+    data[Features] = (data[Features] - mean) / std
+
+def normalizeTestData(data: pd.DataFrame, Features: list[str], trainingMean, trainingStd) -> None:
+    data[Features] = (data[Features] - trainingMean) / trainingStd
+
+def createTrainingDataFrame(trainingDataFileName: str) -> pd.DataFrame:
+    data = pd.read_csv(trainingDataFileName)
+    rename_columns(data)
+    question_conversions(data)
+    Q13_conversion(data)
+    textQ_conversion(data)
+    output_conversion(data)
+    normalizeTestData(data, ["Q7", "Q8", "Q9"])
+    return data
+
+def getTraining(trainFileName: str) -> tuple[np.ndarray, np.array]:
+    data = createTrainingDataFrame(trainFileName)
+    X_train = data.drop(columns=['unique_id', 'Label'])
+    t_train = data["Label"]
+    return X_train.to_numpy(), t_train.to_numpy()
+
