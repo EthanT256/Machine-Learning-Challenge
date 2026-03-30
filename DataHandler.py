@@ -318,7 +318,7 @@ def normalize(text):
     return text
 
 def map_food(text):
-     top_foods = ['apple', 'asparagus','avocado',
+    top_foods = ['apple', 'asparagus','avocado',
              'banana','bean','beef','bread','broccoli','burger', 'butter', 'blueberry', 'blackberry', 
              'candy', 'cake','caramel','carrot','caviar','cereal','cheese','chicken','chocolate', 'coffee', 'cookie', 'corn', 'crab','croissant','cucumber', 'curry', 
              'donut','duck', 
@@ -340,15 +340,15 @@ def map_food(text):
              'vegetable', 
              'water','watermelon', 'wine', 
              'yogurt']
-     
-     text = normalize(text)
-     matches = []
-     
-     for food in top_foods:
+    text = normalize(text)
+    matches = []
+
+    for food in top_foods:
         if re.search(r'\b' + re.escape(food) + r'\b', text):
             matches.append(food)
 
-        return tuple(matches) if matches else text
+    return tuple(matches) if matches else text
+
 
 def Q13_conversion(data: pd.DataFrame) -> pd.DataFrame:
     data["Q13"] = (
@@ -360,8 +360,9 @@ def Q13_conversion(data: pd.DataFrame) -> pd.DataFrame:
         .str.replace(r'\s+', ' ', regex=True)  # clean extra spaces
     )
 
+    data["Q13"] = data["Q13"].apply(map_food)
+
     mapped = data["Q13"].apply(map_food)
-    data["Q13"] = mapped
 
     food_counts = Counter()
     for entry in mapped:
@@ -382,6 +383,7 @@ def Q13_conversion(data: pd.DataFrame) -> pd.DataFrame:
     data = data[(data[indicator_cols].sum(axis=1) > 0)]
 
     dropColumn(data, "Q13")
+
     return data
 
 def create_bag_of_words(data: pd.DataFrame) -> Tuple[np.ndarray, list]:
