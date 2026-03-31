@@ -457,7 +457,7 @@ def normalizeTrainingData(data: pd.DataFrame, Features: list[str]) -> None:
     "std": std.values
     })
 
-    stats_df.to_csv("norm_stats.csv", index=False)
+    #stats_df.to_csv("norm_stats.csv", index=False)
 
 def normalizeTestData(data: pd.DataFrame, Features: list[str], trainingMean, trainingStd) -> None:
     data[Features] = (data[Features] - trainingMean) / trainingStd
@@ -474,13 +474,37 @@ def createTrainingDataFrame(trainingDataFileName: str) -> pd.DataFrame:
 
     return data
 
+def createTestingDataFrame(testDataFileName: str) -> pd.DataFrame:
+    data = pd.read_csv(testDataFileName)
+    rename_columns(data)
+    data = question_conversions(data)
+    data = Q13_conversion(data)
+    data = textQ_conversion(data)
+    output_conversion(data)
+
+    stats = pd.read_csv("norm_stats.csv")
+    stats = stats.set_index("feature")
+
+    trainingMeans = stats["mean"]
+    trainingStds = stats["std"]
+
+    normalizeTestData(data, ["Q7", "Q8", "Q9"], trainingMeans, trainingStds)
+
+    return data
+
 def getTraining(trainFileName: str) -> tuple[np.ndarray, np.array]:
     data = createTrainingDataFrame(trainFileName)
     X_train = data.drop(columns=['unique_id', 'Label'])
     t_train = data["Label"]
-    pd.DataFrame(X_train).to_csv("X_train.csv", index=False)
-    pd.DataFrame(t_train).to_csv("t_train.csv", index=False)
+    #pd.DataFrame(X_train).to_csv("X_train.csv", index=False)
+    #pd.DataFrame(t_train).to_csv("t_train.csv", index=False)
     return X_train.to_numpy(), t_train.to_numpy()
 
-getTraining("train.csv")
+def getTesting(testFileName: str) -> np.ndarray:
+    data = createTestingDataFrame(testFileName)
+    X_train = data.drop(columns=['unique_id', 'Label'])
+    return X_train.to_numpy()
+
+#getTraining("train.csv")
+
 
