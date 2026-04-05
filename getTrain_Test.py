@@ -1,11 +1,26 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
 
-data = pd.read_csv("ml_challenge_dataset.csv")
+# Load your CSV
+df = pd.read_csv("ml_challenge_dataset.csv")  # replace with your file name
 
-# split (90% train, 10% test)
-train, test = train_test_split(data, test_size=0.1, random_state=42)
+# Column containing unique IDs
+id_col = "id"  # replace with your actual ID column name
 
-# save to CSV
-train.to_csv("train.csv", index=False)
-test.to_csv("test.csv", index=False)
+# Get unique IDs and sort if you want "first 90%" in order
+unique_ids = df["unique_id"].unique()
+
+# Split point
+split_idx = int(len(unique_ids) * 0.9)
+train_ids = unique_ids[:split_idx]
+test_ids = unique_ids[split_idx:]
+
+# Create train and test sets
+train_df = df[df["unique_id"].isin(train_ids)]
+test_df  = df[df["unique_id"].isin(test_ids)]
+
+# Save to CSV if needed
+train_df.to_csv("train.csv", index=False)
+test_df.to_csv("test.csv", index=False)
+
+print(f"Training set: {len(train_df)} rows")
+print(f"Test set: {len(test_df)} rows")
