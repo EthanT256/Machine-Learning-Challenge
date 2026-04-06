@@ -104,7 +104,6 @@ def extract_features(row):
             val = likert_map(row.get(col, ''))
         num_vals.append(val)
     num_vals = np.array(num_vals, dtype=float)
-    # Impute NaN with 0
     num_vals = np.nan_to_num(num_vals, nan=0.0)
     # Standardize
     num_scaled = (num_vals - scaler_mean) / scaler_scale
@@ -136,7 +135,6 @@ def extract_features(row):
 def predict(row):
     x = extract_features(row)
     logits = x @ weights.T + intercept
-    # Softmax (for numerical stability)
     exp_logits = np.exp(logits - np.max(logits))
     probs = exp_logits / np.sum(exp_logits)
     pred_idx = np.argmax(probs)
